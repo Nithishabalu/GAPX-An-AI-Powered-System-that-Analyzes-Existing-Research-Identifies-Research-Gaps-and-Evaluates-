@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GAPX – Sign in</title>
+<style>
+  :root{
+    --ink:#14183c; --muted:#5b6080; --line:#d9dcef; --bg:#f4f5fb;
+    --accent:#d6245a; --accent-dark:#b01a48; --card:#fff; --err:#b3261e; --ok:#1b7a43;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);
+       font-family:"Segoe UI",system-ui,sans-serif;color:var(--ink);padding:16px}
+  .card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);
+        border-radius:12px;padding:32px 28px}
+  h1{margin:0 0 4px;font-size:26px;letter-spacing:.5px}
+  .sub{margin:0 0 24px;color:var(--muted);font-size:14px}
+  label{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
+  input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;font-size:15px;color:var(--ink)}
+  input:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .btn{width:100%;margin-top:20px;padding:12px;border:0;border-radius:8px;background:var(--accent);
+       color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+  .btn:hover{background:var(--accent-dark)}
+  .btn:disabled{opacity:.6;cursor:wait}
+  .btn.alt{background:#fff;color:var(--ink);border:1px solid var(--line);margin-top:10px}
+  .btn.alt:hover{background:var(--bg)}
+  .or{text-align:center;color:var(--muted);font-size:12px;margin:16px 0 0}
+  .row{display:flex;justify-content:space-between;margin-top:16px;font-size:13px}
+  .link{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font-size:13px}
+  #msg{min-height:20px;margin-top:14px;font-size:13px}
+  #msg.err{color:var(--err)} #msg.ok{color:var(--ok)}
+  .hide{display:none}
+</style>
+</head>
+<body>
+<main class="card">
+  <h1>GAPX</h1>
+  <p class="sub" id="subtitle">Sign in to your research workspace</p>
+
+  <form id="authForm" novalidate>
+    <div id="nameWrap" class="hide">
+      <label for="name">Full name</label>
+      <input id="name" type="text" autocomplete="name">
+    </div>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="email" required>
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" minlength="6" required>
+
+    <button class="btn" id="submitBtn" type="submit">Sign in</button>
+    <p class="or">or</p>
+    <button class="btn alt" id="googleBtn" type="button">Continue with Google</button>
+    <div id="msg" role="status" aria-live="polite"></div>
+  </form>
+
+  <div class="row">
+    <button class="link" id="toggleBtn" type="button">Create an account</button>
+    <button class="link" id="resetBtn" type="button">Forgot password?</button>
+  </div>
+</main>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+    updateProfile, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail, setPersistence,
+    browserLocalPersistence
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  // 1) Paste your config: Firebase Console > Project settings > Your apps > Web app
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  const NEXT_PAGE = "dashboard.html"; // Phase 1 next step: Create New Research Project
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  await setPersistence(auth, browserLocalPersistence); // keeps the session token
+
+  const $ = id => document.getElementById(id);
+  let mode = "signin";
+
+  const say = (text, type = "err") => { $("msg").textContent = text; $("msg").className = type; };
+  const busy = on => { $("submitBtn").disabled = on; $("googleBtn").disabled = on; };
+
+  const friendly = code => ({
+    "auth/invalid-credential": "Wrong email or password.",
+    "auth/user-not-found": "No account with this email.",
+    "auth/wrong-password": "Wrong email or password.",
+    "auth/email-already-in-use": "This email is already registered. Sign in instead.",
+    "auth/weak-password": "Password must be at least 6 characters.",
+    "auth/invalid-email": "Enter a valid email address.",
+    "auth/popup-closed-by-user": "Google sign-in was cancelled.",
+    "auth/too-many-requests": "Too many attempts. Try again later.",
+    "auth/network-request-failed": "Network error. Check your connection."
+  }[code] || "Something went wrong. Try again.");
+
+  // Already logged in -> go straight to the workspace
+  onAuthStateChanged(auth, user => { if (user) location.href = NEXT_PAGE; });
+
+  $("toggleBtn").onclick = () => {
+    mode = mode === "signin" ? "signup" : "signin";
+    const up = mode === "signup";
+    $("nameWrap").classList.toggle("hide", !up);
+    $("submitBtn").textContent = up ? "Create account" : "Sign in";
+    $("subtitle").textContent = up ? "Create your research workspace" : "Sign in to your research workspace";
+    $("toggleBtn").textContent = up ? "I already have an account" : "Create an account";
+    $("password").autocomplete = up ? "new-password" : "current-password";
+    say("", "");
+  };
+
+  $("authForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const email = $("email").value.trim(), password = $("password").value, name = $("name").value.trim();
+    if (!email || !password) return say("Enter your email and password.");
+    if (mode === "signup" && !name) return say("Enter your full name.");
+    busy(true); say("");
+    try {
+      if (mode === "signup") {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(cred.user, { displayName: name });
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+      // onAuthStateChanged redirects
+    } catch (err) { say(friendly(err.code)); busy(false); }
+  });
+
+  $("googleBtn").onclick = async () => {
+    busy(true); say("");
+    try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+    catch (err) { say(friendly(err.code)); busy(false); }
+  };
+
+  $("resetBtn").onclick = async () => {
+    const email = $("email").value.trim();
+    if (!email) return say("Enter your email above first.");
+    try { await sendPasswordResetEmail(auth, email); say("Reset link sent. Check your inbox.", "ok"); }
+    catch (err) { say(friendly(err.code)); }
+  };
+</script>
+</body>
+</html>
