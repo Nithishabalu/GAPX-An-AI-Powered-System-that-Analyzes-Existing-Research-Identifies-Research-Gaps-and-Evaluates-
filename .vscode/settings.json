@@ -1,0 +1,20 @@
+{
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/.next": true,
+    "**/.git": true,
+    ".vscode": true,
+    "frontend/public": true,
+    "frontend/app/globals.css": true,
+    "frontend/app/favicon.ico": true,
+    "frontend/next.config.ts": true,
+    "frontend/tsconfig.json": true,
+    "frontend/eslint.config.mjs": true,
+    "frontend/next-env.d.ts": true,
+    "frontend/package-lock.json": true,
+    "frontend/.gitignore": true,
+    "frontend/README.md": true,
+    "frontend/AGENTS.md": true,
+    "frontend/CLAUDE.md": true
+  }
+}
